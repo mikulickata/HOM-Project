@@ -1,4 +1,4 @@
-import random, copy
+import random, copy, time
 from .evaluator import check_constraints_and_fitness
 
 def relocate_move(routes):
@@ -39,35 +39,23 @@ def or_opt_move(routes):
         new_routes[r_idx].insert(pos + i, val)
     return new_routes
 
-def local_search_hill_climb(routes, instance, current_f):
+def local_search_hill_climb(routes, instance, current_f, start_time=None, time_limit=None):
     best_r, best_f = routes, current_f
-    improved = True
+    operators = [relocate_move, swap_move, two_opt_move, or_opt_move]
     
-    # Umjesto 1000 nasumičnih, radimo dok god nalazimo poboljšanje (Greedy Descent)
-    # Fokusiramo se na Relocate jer on najbolje smanjuje broj vozila
-    while improved:
-        improved = False
-        
-        # Pokušaj premjestiti svakog kupca na svako drugo mjesto
-        for r1_idx in range(len(best_r)):
-            for i in range(len(best_r[r1_idx])):
-                cust = best_r[r1_idx][i]
-                
-                for r2_idx in range(len(best_r)):
-                    for j in range(len(best_r[r2_idx]) + 1):
-                        if r1_idx == r2_idx and (j == i or j == i + 1): continue
-                        
-                        # Napravi privremeni potez bez copy.deepcopy (radi brzine)
-                        new_r = [list(r) for r in best_r]
-                        new_r[r1_idx].pop(i)
-                        new_r[r2_idx].insert(j, cust)
-                        new_r = [r for r in new_r if r] # Ukloni prazne
-                        
-                        v, f, d, det = check_constraints_and_fitness(new_r, instance)
-                        if f < best_f: # Dopušta i nevalidna s manjom kaznom (Strategic Oscillation)
-                            best_r, best_f = new_r, f
-                            improved = True
-                            break
-                    if improved: break
-                if improved: break
+    # Ako nemamo start_time, stavit ćemo nešto da ne pukne, ali u GA proslijedi prave vrijednosti
+    if start_time is None: start_time = time.time()
+    if time_limit is None: time_limit = 1e9 
+
+    for _ in range(1000): 
+        # Ključni dodatak: prekid ako vrijeme isteče
+        if (time.time() - start_time) > time_limit:
+            break
+            
+        op = random.choice(operators)
+        cand = op(best_r)
+        v, f, d, det = check_constraints_and_fitness(cand, instance)
+        if f < best_f:
+            best_r, best_f = cand, f
+            
     return best_r, best_f

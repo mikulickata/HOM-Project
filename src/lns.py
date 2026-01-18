@@ -1,4 +1,6 @@
 import time, copy, random
+
+from src.utils import local_search_hill_climb
 from .evaluator import check_constraints_and_fitness
 
 def lns_solve(instance, initial, time_limit, ruin_factor):
