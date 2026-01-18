@@ -1,33 +1,28 @@
-import time
-from .utils import shaking, local_search_2opt
+import time, random, copy
+from .utils import relocate_move, swap_move, two_opt_move
 from .evaluator import check_constraints_and_fitness
 
-def vns_solve(instance, initial_routes, time_limit, k_max_param):
-    best_routes = initial_routes
-    valid, best_f, best_dist, best_detailed = check_constraints_and_fitness(best_routes, instance)
-    
+def vns_solve(instance, initial, time_limit, k_max, full_set=False):
+    best_routes = initial
+    _, best_f, best_d, best_det = check_constraints_and_fitness(best_routes, instance)
     start_time = time.time()
-    eval_count = 1
-    k_max = k_max_param 
-
+    
     while (time.time() - start_time) < time_limit:
         k = 1
-        while k <= k_max and (time.time() - start_time) < time_limit:
-            candidate = shaking(best_routes, k)
-            
-            # Local search vraća najbolju verziju rute i fitness
-            candidate, f_ls = local_search_2opt(candidate, instance, best_f)
-            
-            is_valid, f_cand, d_cand, det_cand = check_constraints_and_fitness(candidate, instance)
-            eval_count += 10 # 2-opt radi mnogo internih evaluacija
-            
-            if is_valid and f_cand < best_f:
-                best_routes = candidate
-                best_f = f_cand
-                best_dist = d_cand
-                best_detailed = det_cand
-                k = 1 # Resetiramo k jer smo našli poboljšanje
+        while k <= k_max:
+            if not full_set:
+                # Basic: Samo Relocate i Swap
+                cand = relocate_move(best_routes) if k % 2 == 0 else swap_move(best_routes)
+            else:
+                # Full: Relocate, Swap, 2-opt
+                op = random.choice([relocate_move, swap_move, two_opt_move])
+                cand = op(best_routes)
+
+            v, f, d, det = check_constraints_and_fitness(cand, instance)
+            if v and f < best_f:
+                best_routes, best_f, best_d, best_det = cand, f, d, det
+                k = 1
             else:
                 k += 1
-                
-    return best_routes, best_dist, best_detailed, eval_count
+            if (time.time() - start_time) >= time_limit: break
+    return best_routes, best_d, best_det, 0
