@@ -1,0 +1,10 @@
+# Folder sa generiranim rješenjima
+solutions/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Ako koristiš virtualno okruženje
+venv/
+.venv/
