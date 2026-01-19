@@ -2,8 +2,7 @@ import math
 
 evaluation_count = 0
 
-# src/evaluator.py - Nadogradnja s kaznenim funkcijama
-def check_constraints_and_fitness(routes, instance, penalty_capacity=1000, penalty_time=100):
+def check_constraints_and_fitness(routes, instance, penalty_capacity=2000, penalty_time=500):
     global evaluation_count
     evaluation_count += 1
     
@@ -17,7 +16,6 @@ def check_constraints_and_fitness(routes, instance, penalty_capacity=1000, penal
         if not route: continue
         curr_load = 0
         curr_time = 0
-        service_time = 0
         prev_node = instance.depot
         route_str = "0(0)"
         
@@ -27,9 +25,8 @@ def check_constraints_and_fitness(routes, instance, penalty_capacity=1000, penal
             curr_load += node.demand
             
             d_ij = math.sqrt((prev_node.x - node.x)**2 + (prev_node.y - node.y)**2)
-            arrival_time = curr_time + service_time + math.ceil(d_ij)
+            arrival_time = curr_time + prev_node.service_time + d_ij
             
-            # Ako zakasni, bilježimo kršenje
             if arrival_time > node.due_date:
                 total_time_violation += (arrival_time - node.due_date)
             
@@ -38,27 +35,32 @@ def check_constraints_and_fitness(routes, instance, penalty_capacity=1000, penal
             route_str += f"->{node.id}({int(start_service_time)})"
             
             curr_time = start_service_time
-            service_time = node.service_time
             prev_node = node
 
-        # Kapacitet rute
         if curr_load > instance.capacity:
             total_excess_load += (curr_load - instance.capacity)
             
-        # Povratak u depo
         d_to_depot = math.sqrt((prev_node.x - instance.depot.x)**2 + (prev_node.y - instance.depot.y)**2)
-        return_time = curr_time + service_time + math.ceil(d_to_depot)
+        return_time = curr_time + prev_node.service_time + d_to_depot
         if return_time > instance.depot.due_date:
             total_time_violation += (return_time - instance.depot.due_date)
         
         total_dist += d_to_depot
         detailed_routes.append(route_str + f"->0({int(return_time)})")
 
-    # Provjera jesu li svi posluženi (ovo ostaje strogo)
-    is_valid = (len(visited) == len(instance.customers)) and (total_excess_load == 0) and (total_time_violation == 0)
+    # BROJ VOZILA mora imati najveći ponder u fitnessu
+    num_vehicles = len(detailed_routes)
+    all_served = (len(visited) == len(instance.customers))
     
-    # FITNESS formula koja dopušta "istraživanje" nevalidnih područja
-    # Broj vozila (najbitnije) + distanca + kazne
-    fitness = (len(detailed_routes) * 10**7) + total_dist + (total_excess_load * penalty_capacity) + (total_time_violation * penalty_time)
+    # Ako nisu svi posluženi, fitness je beskonačan
+    if not all_served:
+        return False, 1e25, 0, []
+
+    # Fitness: Kazne su uključene tako da algoritam može "evoluirati" kroz nevalidna rješenja
+    penalty = (total_excess_load * penalty_capacity) + (total_time_violation * penalty_time)
+    fitness = (num_vehicles * 1000000) + total_dist + penalty
+    
+    # Validno je samo ako nema nikakvih kršenja
+    is_valid = (total_excess_load == 0 and total_time_violation == 0)
     
     return is_valid, fitness, round(total_dist, 2), detailed_routes

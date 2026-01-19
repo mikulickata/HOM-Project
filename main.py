@@ -16,8 +16,10 @@ from src.memetic import memetic_solve
 from src.evaluator import check_constraints_and_fitness
 
 def save_solution(name, routes, dist, detailed):
+    # Čistimo ime datoteke od znakova koji nisu dopušteni u Windows/Linux sustavima
+    clean_name = name.replace("{", "").replace("}", "").replace("'", "").replace(":", "-").replace(" ", "")
     os.makedirs("solutions", exist_ok=True)
-    with open(os.path.join("solutions", name), "w") as f:
+    with open(os.path.join("solutions", clean_name), "w") as f:
         f.write(f"{len(detailed)}\n")
         for i, path in enumerate(detailed, 1):
             f.write(f"{i}: {path}\n")
@@ -48,74 +50,51 @@ def run_experiment():
         initial = greedy_solve(instance)
         _, _, g_dist, g_det = check_constraints_and_fitness(initial, instance)
         
-        print(f"\n" + "="*85)
+        print(f"\n" + "="*100)
         print(f" PROCESSING: {inst_id} | Greedy Dist: {g_dist:.2f}")
-        print("="*85)
+        print("="*100)
 
         for t_label, t_sec in configs:
-            print(f"\n--- TIME LIMIT: {t_label} ---")
-            is_un = (t_label == "un")
+            print(f"\n--- TIME LIMIT: {t_label} ({t_sec}s) ---")
 
-            # 1. FIKSNI - VNS FULL (Uvijek)
-            evaluator.evaluation_count = 0
-            res, dist, det, _ = vns_solve(instance, initial, t_sec, full_set=True, k_max=25)
-            save_solution(f"res-{t_label}-{inst_id}-VNS_FULL.txt", res, dist, det)
-            print(f"    VNS_FULL    | Evals: {evaluator.evaluation_count:8} | Veh: {len(det):2} | Dist: {dist:.2f}")
-
-            # 2. FIKSNI - VND (Samo ako NIJE unlimited)
-            if not is_un:
+            # 1. FIKSNI ALGORITMI
+            for name, func in [("VNS_FULL", vns_solve), ("VND", vnd_solve)]:
                 evaluator.evaluation_count = 0
-                res, dist, det, _ = vnd_solve(instance, initial, t_sec)
-                save_solution(f"res-{t_label}-{inst_id}-VND.txt", res, dist, det)
-                print(f"    VND         | Evals: {evaluator.evaluation_count:8} | Veh: {len(det):2} | Dist: {dist:.2f}")
-
-            # 3. PARAMETARSKI (p1-p5)
-            for p in range(1, 6):
-                print(f"    > p{p}:")
-
-                # --- GRUPA: UVIJEK (1m, 5m, un) ---
-                # HYBRID
-                evaluator.evaluation_count = 0
-                res, dist, det, _ = sa_solve(instance, initial, t_sec, T_init=hybrid_configs[p][0], alpha_param=hybrid_configs[p][1], hybrid=True)
-                save_solution(f"res-{t_label}-{inst_id}-HYBRID-p{p}.txt", res, dist, det)
-                print(f"      HYBRID-p{p}  | Veh: {len(det):2} | Dist: {dist:.2f}")
-
-                # SA, VNS_BASIC, GA, TABU
-                for name, func, cfg in [("SA", sa_solve, sa_configs[p]), ("VNS_B", vns_solve, vns_configs[p]), 
-                                        ("GA", ga_solve, ga_configs[p]), ("TABU", tabu_solve, tabu_configs[p])]:
-                    evaluator.evaluation_count = 0
-                    if name == "SA": r, d, dt, _ = func(instance, initial, t_sec, T_init=cfg[0], alpha_param=cfg[1])
-                    elif name == "VNS_B": r, d, dt, _ = func(instance, initial, t_sec, k_max=cfg, full_set=False)
-                    elif name == "GA": r, d, dt, _ = func(instance, initial, t_sec, population_size=cfg)
-                    elif name == "TABU": r, d, dt, _ = func(instance, initial, t_sec, list_size=cfg)
-                    save_solution(f"res-{t_label}-{inst_id}-{name}-p{p}.txt", r, d, dt)
-                    print(f"      {name:10}-p{p} | Veh: {len(dt):2} | Dist: {d:.2f}")
-
-                # --- GRUPA: SAMO KAD NIJE UN ---
-                if not is_un:
-                    # ILS
-                    evaluator.evaluation_count = 0
-                    r, d, dt, _ = ils_solve(instance, initial, t_sec, n_perturbations=ils_configs[p])
-                    save_solution(f"res-{t_label}-{inst_id}-ILS-p{p}.txt", r, d, dt)
-                    print(f"      ILS-p{p:5}    | Veh: {len(dt):2} | Dist: {d:.2f}")
-                    # LNS
-                    evaluator.evaluation_count = 0
-                    r, d, dt, _ = lns_solve(instance, initial, t_sec, ruin_factor=lns_configs[p])
-                    save_solution(f"res-{t_label}-{inst_id}-LNS-p{p}.txt", r, d, dt)
-                    print(f"      LNS-p{p:5}    | Veh: {len(dt):2} | Dist: {d:.2f}")
-
-                # --- GRUPA: SAMO KAD JE UN ---
+                if name == "VNS_FULL":
+                    res, dist, det, _ = func(instance, initial, t_sec, full_set=True, k_max=25)
+                    cfg_info = "full=True,k=25"
                 else:
-                    # HGS, ALNS, ACO, MEMETIC
-                    heavy = [("HGS", hgs_solve, "pop_size", hgs_configs[p]), 
-                             ("ALNS", alns_solve, "intensity", alns_configs[p]),
-                             ("ACO", aco_solve, "n_ants", aco_configs[p]),
-                             ("MEMETIC", memetic_solve, "ls_intensity", memetic_configs[p])]
-                    for h_name, h_func, h_param, h_val in heavy:
-                        evaluator.evaluation_count = 0
-                        r, d, dt, _ = h_func(instance, initial, t_sec, **{h_param: h_val})
-                        save_solution(f"res-{t_label}-{inst_id}-{h_name}-p{p}.txt", r, d, dt)
-                        print(f"      {h_name:10}-p{p} | Veh: {len(dt):2} | Dist: {d:.2f}")
+                    res, dist, det, _ = func(instance, initial, t_sec)
+                    cfg_info = "default"
+                
+                save_solution(f"res-{t_label}-{inst_id}-{name}-{cfg_info}.txt", res, dist, det)
+                print(f"    {name:11} | {cfg_info:20} | Evals: {evaluator.evaluation_count:8} | Veh: {len(det):2} | Dist: {dist:.2f}")
+
+            # 2. PARAMETARSKI ALGORITMI (p1-p5)
+            for p in range(1, 6):
+                methods = [
+                    ("HYBRID", sa_solve, {"T_init": hybrid_configs[p][0], "alpha_param": hybrid_configs[p][1], "hybrid": True}),
+                    ("SA", sa_solve, {"T_init": sa_configs[p][0], "alpha_param": sa_configs[p][1]}),
+                    ("VNS_B", vns_solve, {"k_max": vns_configs[p], "full_set": False}),
+                    ("GA", ga_solve, {"population_size": ga_configs[p]}),
+                    ("TABU", tabu_solve, {"list_size": tabu_configs[p]}),
+                    ("ILS", ils_solve, {"n_perturbations": ils_configs[p]}),
+                    ("LNS", lns_solve, {"ruin_factor": lns_configs[p]}),
+                    ("HGS", hgs_solve, {"pop_size": hgs_configs[p]}),
+                    ("ALNS", alns_solve, {"intensity": alns_configs[p]}),
+                    ("ACO", aco_solve, {"n_ants": aco_configs[p]}),
+                    ("MEMETIC", memetic_solve, {"ls_intensity": memetic_configs[p]})
+                ]
+
+                for m_name, m_func, m_params in methods:
+                    # Kreiranje čitljivog stringa konfiguracije: "param1=val1,param2=val2"
+                    cfg_str = ",".join([f"{k}={v}" for k, v in m_params.items()])
+                    
+                    evaluator.evaluation_count = 0
+                    r, d, dt, _ = m_func(instance, initial, t_sec, **m_params)
+                    
+                    save_solution(f"res-{t_label}-{inst_id}-{m_name}-{cfg_str}.txt", r, d, dt)
+                    print(f"      {m_name:10} | {cfg_str:30} | Evals: {evaluator.evaluation_count:8} | Veh: {len(dt):2} | Dist: {d:.2f}")
 
 if __name__ == "__main__":
     run_experiment()

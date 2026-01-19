@@ -49,41 +49,47 @@ def vidal_split(giant_tour, instance):
     return routes[::-1]
 
 def hgs_solve(instance, initial, time_limit, pop_size):
+    # Generiraj početnu populaciju s varijacijama
+    gt_base = [c for r in initial for c in r]
+    population = []
+    for _ in range(pop_size):
+        individual = list(gt_base)
+        if len(population) > 0: random.shuffle(individual)
+        population.append(individual)
+
     best_routes = initial
-    valid, best_f, best_d, best_det = check_constraints_and_fitness(initial, instance)
+    v, best_f, best_d, best_det = check_constraints_and_fitness(initial, instance)
     
-    gt = [c for r in initial for c in r]
-    pop = [gt]
     start_time = time.time()
-    
     while (time.time() - start_time) < time_limit:
-        if len(pop) < 2: 
-            p1 = pop[0]
-            p2 = copy.deepcopy(p1)
-            random.shuffle(p2)
-        else:
-            p1, p2 = random.sample(pop, 2)
-            
+        p1, p2 = random.sample(population, 2)
         # OX Crossover
-        i, j = sorted(random.sample(range(len(p1)), 2))
-        child = [None] * len(p1)
-        child[i:j] = p1[i:j]
-        remaining = [item for item in p2 if item not in child]
-        ptr = 0
-        for idx in range(len(child)):
-            if child[idx] is None:
-                child[idx] = remaining[ptr]
-                ptr += 1
+        size = len(p1)
+        a, b = sorted(random.sample(range(size), 2))
+        child = [None] * size
+        child[a:b] = p1[a:b]
+        p2_remaining = [item for item in p2 if item not in child[a:b]]
         
+        curr = 0
+        for i in range(size):
+            if child[i] is None:
+                child[i] = p2_remaining[curr]
+                curr += 1
+        
+        # Split i Local Search (obrazovanje djeteta)
         cand_routes = vidal_split(child, instance)
+        # MALA TAJNA: Dodaj Local Search ovdje da polira dijete prije evaluacije!
+        
         v, f, d, det = check_constraints_and_fitness(cand_routes, instance)
         
-        if v:
-            if f < best_f:
-                best_f, best_d, best_det, best_routes = f, d, det, cand_routes
-            pop.append(child)
-            # Korištenje pop_size parametra
-            if len(pop) > pop_size:
-                pop.pop(random.randint(0, len(pop)-2)) 
+        # Čak i ako je nevalidno, fitness će ga rangirati
+        population.append(child)
+        if v and f < best_f:
+            best_f, best_d, best_det, best_routes = f, d, det, cand_routes
             
+        if len(population) > pop_size * 2:
+            # Preživljavanje: izbaci najgore po fitnessu
+            population.sort(key=lambda x: check_constraints_and_fitness(vidal_split(x, instance), instance)[1])
+            population = population[:pop_size]
+
     return best_routes, best_d, best_det, 0
