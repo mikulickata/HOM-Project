@@ -55,46 +55,47 @@ def run_experiment():
         print("="*100)
 
         for t_label, t_sec in configs:
-            print(f"\n--- TIME LIMIT: {t_label} ({t_sec}s) ---")
+            if not inst_id == 'i2' or not inst_id == 'i1':
+                print(f"\n--- TIME LIMIT: {t_label} ({t_sec}s) ---")
 
-            # 1. FIKSNI ALGORITMI
-            for name, func in [("VNS_FULL", vns_solve), ("VND", vnd_solve)]:
-                evaluator.evaluation_count = 0
-                if name == "VNS_FULL":
-                    res, dist, det, _ = func(instance, initial, t_sec, full_set=True, k_max=25)
-                    cfg_info = "full=True,k=25"
-                else:
-                    res, dist, det, _ = func(instance, initial, t_sec)
-                    cfg_info = "default"
-                
-                save_solution(f"res-{t_label}-{inst_id}-{name}-{cfg_info}.txt", res, dist, det)
-                print(f"    {name:11} | {cfg_info:20} | Evals: {evaluator.evaluation_count:8} | Veh: {len(det):2} | Dist: {dist:.2f}")
-
-            # 2. PARAMETARSKI ALGORITMI (p1-p5)
-            for p in range(1, 6):
-                methods = [
-                    ("HYBRID", sa_solve, {"T_init": hybrid_configs[p][0], "alpha_param": hybrid_configs[p][1], "hybrid": True}),
-                    ("SA", sa_solve, {"T_init": sa_configs[p][0], "alpha_param": sa_configs[p][1]}),
-                    ("VNS_B", vns_solve, {"k_max": vns_configs[p], "full_set": False}),
-                    ("GA", ga_solve, {"population_size": ga_configs[p]}),
-                    ("TABU", tabu_solve, {"list_size": tabu_configs[p]}),
-                    ("ILS", ils_solve, {"n_perturbations": ils_configs[p]}),
-                    ("LNS", lns_solve, {"ruin_factor": lns_configs[p]}),
-                    ("HGS", hgs_solve, {"pop_size": hgs_configs[p]}),
-                    ("ALNS", alns_solve, {"intensity": alns_configs[p]}),
-                    ("ACO", aco_solve, {"n_ants": aco_configs[p]}),
-                    ("MEMETIC", memetic_solve, {"ls_intensity": memetic_configs[p]})
-                ]
-
-                for m_name, m_func, m_params in methods:
-                    # Kreiranje čitljivog stringa konfiguracije: "param1=val1,param2=val2"
-                    cfg_str = ",".join([f"{k}={v}" for k, v in m_params.items()])
-                    
+                # 1. FIKSNI ALGORITMI
+                for name, func in [("VNS_FULL", vns_solve), ("VND", vnd_solve)]:
                     evaluator.evaluation_count = 0
-                    r, d, dt, _ = m_func(instance, initial, t_sec, **m_params)
+                    if name == "VNS_FULL":
+                        res, dist, det, _ = func(instance, initial, t_sec, full_set=True, k_max=25)
+                        cfg_info = "full=True,k=25"
+                    else:
+                        res, dist, det, _ = func(instance, initial, t_sec)
+                        cfg_info = "default"
                     
-                    save_solution(f"res-{t_label}-{inst_id}-{m_name}-{cfg_str}.txt", r, d, dt)
-                    print(f"      {m_name:10} | {cfg_str:30} | Evals: {evaluator.evaluation_count:8} | Veh: {len(dt):2} | Dist: {d:.2f}")
+                    save_solution(f"res-{t_label}-{inst_id}-{name}-{cfg_info}.txt", res, dist, det)
+                    print(f"    {name:11} | {cfg_info:20} | Evals: {evaluator.evaluation_count:8} | Veh: {len(det):2} | Dist: {dist:.2f}")
+
+                # 2. PARAMETARSKI ALGORITMI (p1-p5)
+                for p in range(1, 6):
+                        methods = [
+                            ("HYBRID", sa_solve, {"T_init": hybrid_configs[p][0], "alpha_param": hybrid_configs[p][1], "hybrid": True}),
+                            ("SA", sa_solve, {"T_init": sa_configs[p][0], "alpha_param": sa_configs[p][1]}),
+                            ("VNS_B", vns_solve, {"k_max": vns_configs[p], "full_set": False}),
+                            ("GA", ga_solve, {"population_size": ga_configs[p]}),
+                            ("TABU", tabu_solve, {"list_size": tabu_configs[p]}),
+                            ("ILS", ils_solve, {"n_perturbations": ils_configs[p]}),
+                            ("LNS", lns_solve, {"ruin_factor": lns_configs[p]}),
+                            ("HGS", hgs_solve, {"pop_size": hgs_configs[p]}),
+                            ("ALNS", alns_solve, {"intensity": alns_configs[p]}),
+                            ("ACO", aco_solve, {"n_ants": aco_configs[p]}),
+                            ("MEMETIC", memetic_solve, {"ls_intensity": memetic_configs[p]})
+                        ]
+
+                        for m_name, m_func, m_params in methods:
+                            # Kreiranje čitljivog stringa konfiguracije: "param1=val1,param2=val2"
+                            cfg_str = ",".join([f"{k}={v}" for k, v in m_params.items()])
+                            
+                            evaluator.evaluation_count = 0
+                            r, d, dt, _ = m_func(instance, initial, t_sec, **m_params)
+                            
+                            save_solution(f"res-{t_label}-{inst_id}-{m_name}-{cfg_str}.txt", r, d, dt)
+                            print(f"      {m_name:10} | {cfg_str:30} | Evals: {evaluator.evaluation_count:8} | Veh: {len(dt):2} | Dist: {d:.2f}")
 
 if __name__ == "__main__":
     run_experiment()
